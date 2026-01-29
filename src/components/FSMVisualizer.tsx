@@ -15,10 +15,14 @@ export default function FSMVisualizer({ fsm, currentState, highlightedTransition
   const stateRadius = 30;
 
   // Calculate state positions in a circle
+  // Support both 0-based and 1-based indexing
   const statePositions: Record<number, { x: number; y: number }> = {};
-  for (let i = 0; i < fsm.states; i++) {
-    const stateNum = i + 1;
-    const angle = (2 * Math.PI * i / fsm.states) - (Math.PI / 2);
+  const numStates = fsm.zeroIndexed ? fsm.states + 1 : fsm.states;
+  const startIndex = fsm.zeroIndexed ? 0 : 1;
+  
+  for (let i = 0; i < numStates; i++) {
+    const stateNum = startIndex + i;
+    const angle = (2 * Math.PI * i / numStates) - (Math.PI / 2);
     statePositions[stateNum] = {
       x: centerX + radius * Math.cos(angle),
       y: centerY + radius * Math.sin(angle),
