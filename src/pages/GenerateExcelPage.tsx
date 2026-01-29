@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, FileSpreadsheet, Plus, Trash2, Download, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileSpreadsheet, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,9 @@ type Step = 'count' | 'buffer' | 'experiments' | 'concentrations' | 'generate';
 interface ExperimentData {
   name: string;
   fsmInput: string;
+  fluorophore: string;
   result: 'ACCEPT' | 'REJECT' | null;
+  finalState: number | null;
 }
 
 export default function GenerateExcelPage() {
@@ -26,11 +28,11 @@ export default function GenerateExcelPage() {
   
   // Form data
   const [experimentCount, setExperimentCount] = useState<number>(1);
-  const [bufferName, setBufferName] = useState<string>('5RF ATTO');
+  const [bufferName, setBufferName] = useState<string>('5RF (ATTO) 79nM');
   const [experiments, setExperiments] = useState<ExperimentData[]>([]);
   const [stockConcentration, setStockConcentration] = useState<number>(50);
-  const [targetConcentration, setTargetConcentration] = useState<number>(0);
-  const [totalVolume, setTotalVolume] = useState<number>(0);
+  const [targetConcentration, setTargetConcentration] = useState<number>(1);
+  const [totalVolume, setTotalVolume] = useState<number>(80);
   
   // Error state
   const [error, setError] = useState<string | null>(null);
@@ -52,23 +54,27 @@ export default function GenerateExcelPage() {
       newExperiments.push({
         name: '',
         fsmInput: '',
+        fluorophore: 'ANS N',
         result: null,
+        finalState: null,
       });
     }
     setExperiments(newExperiments);
   };
 
-  const updateExperiment = (index: number, field: 'name' | 'fsmInput', value: string) => {
+  const updateExperiment = (index: number, field: keyof ExperimentData, value: string) => {
     const updated = [...experiments];
     updated[index] = { ...updated[index], [field]: value };
     
-    // If updating fsmInput, validate it
+    // If updating fsmInput, validate it and get final state
     if (field === 'fsmInput' && value.trim()) {
       try {
-        const result = evaluateFSM(fsmData, value.trim());
-        updated[index].result = result;
+        const evalResult = evaluateFSM(fsmData, value.trim());
+        updated[index].result = evalResult.result;
+        updated[index].finalState = evalResult.finalState;
       } catch {
         updated[index].result = null;
+        updated[index].finalState = null;
       }
     }
     
@@ -86,16 +92,14 @@ export default function GenerateExcelPage() {
         setError(`Experiment ${i + 1} is missing an FSM input value`);
         return false;
       }
+      if (!exp.fluorophore.trim()) {
+        setError(`Experiment ${i + 1} is missing a fluorophore`);
+        return false;
+      }
       if (exp.result === null) {
         setError(`Experiment ${i + 1} has an invalid FSM input`);
         return false;
       }
-    }
-    
-    // Check if any experiment failed validation
-    const hasReject = experiments.some(exp => exp.result === 'REJECT');
-    if (hasReject) {
-      // This is allowed - we just show the result
     }
     
     return true;
@@ -115,7 +119,7 @@ export default function GenerateExcelPage() {
         break;
       case 'buffer':
         if (!bufferName.trim()) {
-          setBufferName('5RF ATTO');
+          setBufferName('5RF (ATTO) 79nM');
         }
         setCurrentStep('experiments');
         break;
@@ -164,11 +168,13 @@ export default function GenerateExcelPage() {
         name: exp.name,
         fsmInput: exp.fsmInput,
         result: exp.result!,
+        finalState: exp.finalState!,
+        fluorophore: exp.fluorophore,
       }));
       
       const workbook = generateExcelWorkbook({
         experiments: experimentInputs,
-        bufferName: bufferName || '5RF ATTO',
+        bufferName: bufferName || '5RF (ATTO) 79nM',
         stockConcentration: stockConcentration || 50,
         targetConcentration,
         totalVolume,
@@ -195,7 +201,7 @@ export default function GenerateExcelPage() {
   const stepDescriptions: Record<Step, string> = {
     count: 'How many experiments are being performed?',
     buffer: 'Enter the buffer name (press Enter for default)',
-    experiments: 'Enter details for each experiment',
+    experiments: 'Enter details for each experiment including fluorophore',
     concentrations: 'Enter concentration and volume parameters',
     generate: 'Review and generate your Excel file',
   };
@@ -284,13 +290,13 @@ export default function GenerateExcelPage() {
                 <Label htmlFor="bufferName">Buffer Name</Label>
                 <Input
                   id="bufferName"
-                  placeholder="5RF ATTO"
+                  placeholder="5RF (ATTO) 79nM"
                   value={bufferName}
                   onChange={(e) => setBufferName(e.target.value)}
                   className="font-mono"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Leave empty to use default: 5RF ATTO
+                  Default: 5RF (ATTO) 79nM
                 </p>
               </div>
             </div>
@@ -302,15 +308,22 @@ export default function GenerateExcelPage() {
                 <Card key={idx} className="p-4 bg-muted/30">
                   <div className="flex items-center justify-between mb-3">
                     <span className="font-mono font-medium">Experiment {idx + 1}</span>
-                    {exp.result && (
-                      <span className={`px-2 py-1 rounded text-xs font-mono ${
-                        exp.result === 'ACCEPT' 
-                          ? 'bg-success/20 text-success' 
-                          : 'bg-destructive/20 text-destructive'
-                      }`}>
-                        {exp.result}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {exp.finalState !== null && (
+                        <span className="px-2 py-1 rounded text-xs font-mono bg-muted">
+                          State: q{exp.finalState}
+                        </span>
+                      )}
+                      {exp.result && (
+                        <span className={`px-2 py-1 rounded text-xs font-mono ${
+                          exp.result === 'ACCEPT' 
+                            ? 'bg-success/20 text-success' 
+                            : 'bg-destructive/20 text-destructive'
+                        }`}>
+                          {exp.result}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="grid gap-3">
                     <div className="space-y-1">
@@ -337,6 +350,18 @@ export default function GenerateExcelPage() {
                         className="font-mono"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`exp-fluor-${idx}`} className="text-xs">
+                        Fluorophore (e.g., ANS N)
+                      </Label>
+                      <Input
+                        id={`exp-fluor-${idx}`}
+                        placeholder="ANS N"
+                        value={exp.fluorophore}
+                        onChange={(e) => updateExperiment(idx, 'fluorophore', e.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -346,7 +371,7 @@ export default function GenerateExcelPage() {
           {currentStep === 'concentrations' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="stockConc">Stock Concentration</Label>
+                <Label htmlFor="stockConc">Stock Concentration (µM)</Label>
                 <Input
                   id="stockConc"
                   type="number"
@@ -355,10 +380,10 @@ export default function GenerateExcelPage() {
                   onChange={(e) => setStockConcentration(parseFloat(e.target.value) || 50)}
                   className="font-mono"
                 />
-                <p className="text-xs text-muted-foreground">Default: 50</p>
+                <p className="text-xs text-muted-foreground">Default: 50 µM</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="targetConc">Target Concentration *</Label>
+                <Label htmlFor="targetConc">Target Concentration (µM) *</Label>
                 <Input
                   id="targetConc"
                   type="number"
@@ -370,16 +395,17 @@ export default function GenerateExcelPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="totalVol">Total Volume *</Label>
+                <Label htmlFor="totalVol">Total Reaction Volume (nL) *</Label>
                 <Input
                   id="totalVol"
                   type="number"
-                  step="0.1"
+                  step="1"
                   value={totalVolume || ''}
                   onChange={(e) => setTotalVolume(parseFloat(e.target.value) || 0)}
                   className="font-mono"
                   required
                 />
+                <p className="text-xs text-muted-foreground">Default: 80 nL</p>
               </div>
             </div>
           )}
@@ -396,35 +422,38 @@ export default function GenerateExcelPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Buffer:</span>
-                    <span className="ml-2 font-mono">{bufferName || '5RF ATTO'}</span>
+                    <span className="ml-2 font-mono text-xs">{bufferName || '5RF (ATTO) 79nM'}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Stock Conc.:</span>
-                    <span className="ml-2 font-mono">{stockConcentration || 50}</span>
+                    <span className="ml-2 font-mono">{stockConcentration || 50} µM</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Target Conc.:</span>
-                    <span className="ml-2 font-mono">{targetConcentration}</span>
+                    <span className="ml-2 font-mono">{targetConcentration} µM</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total Volume:</span>
-                    <span className="ml-2 font-mono">{totalVolume}</span>
+                    <span className="ml-2 font-mono">{totalVolume} nL</span>
                   </div>
                 </div>
                 
                 <div className="border-t border-border pt-3 mt-3">
                   <h4 className="font-medium text-sm text-muted-foreground mb-2">Experiments:</h4>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {experiments.map((exp, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <span className="font-mono">{exp.name}</span>
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs bg-muted px-1 rounded">{exp.fsmInput}</code>
-                          <span className={`text-xs ${
-                            exp.result === 'ACCEPT' ? 'text-success' : 'text-destructive'
+                      <div key={idx} className="bg-background rounded p-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-medium">{exp.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            exp.result === 'ACCEPT' ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
                           }`}>
                             {exp.result}
                           </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Input: <code className="bg-muted px-1 rounded">{exp.fsmInput}</code>
+                          {' → '}Position {exp.finalState}; {exp.fluorophore}
                         </div>
                       </div>
                     ))}
