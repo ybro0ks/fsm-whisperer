@@ -190,7 +190,8 @@ export class FSMParser {
     
     // Try new format first: on '0' move '1', on '1' move '2'
     // Pattern: on 'symbol' move 'target' (case-insensitive, handles typos like "mocve")
-    const newFormatPattern = /on\s*['"](\d+)['"]\s*\.?\s*m\w*\s*['"](\d+)['"]/gi;
+    // Also handles period after symbol quote like: on '1'. Move '1'
+    const newFormatPattern = /on\s*['"](\d+)['"]\.?\s*m\w*\s*['"](\d+)['"]\.?/gi;
     let newFormatMatch;
     
     while ((newFormatMatch = newFormatPattern.exec(transitionsStr)) !== null) {
