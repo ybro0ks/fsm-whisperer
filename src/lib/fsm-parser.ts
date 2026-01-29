@@ -142,8 +142,14 @@ export class FSMParser {
   private parseTransitions(lines: string[], startIdx: number): number {
     this.fieldsFound.add('transitions');
     
-    // Check if the first transition is on the same line as "transitions ="
     const firstLine = lines[startIdx].trim();
+    
+    // Check for JSON-like format: transitions = { ... }
+    if (firstLine.match(/transitions\s*=\s*\{/i)) {
+      return this.parseJsonTransitions(lines, startIdx);
+    }
+    
+    // Check if the first transition is on the same line as "transitions ="
     const inlineMatch = firstLine.match(/transitions\s*=\s*(\d+[:\.]?\s*.+)/i);
     
     let i = startIdx;
@@ -170,6 +176,56 @@ export class FSMParser {
       }
       
       this.parseTransitionLine(line);
+      i++;
+    }
+    
+    return i;
+  }
+
+  private parseJsonTransitions(lines: string[], startIdx: number): number {
+    let i = startIdx;
+    
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      this.currentLine = i + 1;
+      
+      // Skip empty lines and opening brace
+      if (!line || line === '{') {
+        i++;
+        continue;
+      }
+      
+      // Check for closing brace - end of transitions block
+      if (line === '}') {
+        return i;
+      }
+      
+      // Check for other fields (end of transitions)
+      const lineLower = line.toLowerCase();
+      if (['name', 'states', 'symbols', 'startstate', 'acceptstate'].some(field => lineLower.startsWith(field))) {
+        return i - 1;
+      }
+      
+      // Parse JSON-like transition: 1: { "0": 1, "1": 2 },
+      const jsonMatch = line.match(/(\d+)\s*:\s*\{([^}]+)\}/);
+      if (jsonMatch) {
+        const state = parseInt(jsonMatch[1], 10);
+        const transitionsStr = jsonMatch[2];
+        
+        const transitions: [string, string][] = [];
+        // Match "symbol": target pairs
+        const pairPattern = /["'](\d+)["']\s*:\s*(\d+)/g;
+        let pairMatch;
+        
+        while ((pairMatch = pairPattern.exec(transitionsStr)) !== null) {
+          transitions.push([pairMatch[1], pairMatch[2]]);
+        }
+        
+        if (transitions.length > 0) {
+          this.data.transitions[state] = transitions;
+        }
+      }
+      
       i++;
     }
     
