@@ -1,6 +1,7 @@
 /**
  * FSM Parser - TypeScript port of validate.py
  * Parses and validates Finite State Machine definition files
+ * Supports both 0-based and 1-based state indexing
  */
 
 export interface FSMData {
@@ -10,6 +11,7 @@ export interface FSMData {
   transitions: Record<number, [string, string][]>;
   startstate: number;
   acceptstate: number;
+  zeroIndexed: boolean; // Track which indexing scheme is used
 }
 
 export class FSMValidationError extends Error {
@@ -32,6 +34,7 @@ export class FSMParser {
     transitions: Record<number, [string, string][]>;
     startstate: number | null;
     acceptstate: number | null;
+    zeroIndexed: boolean;
   };
   
   private fieldsFound: Set<string>;
@@ -45,6 +48,7 @@ export class FSMParser {
       transitions: {},
       startstate: null,
       acceptstate: null,
+      zeroIndexed: false,
     };
     this.fieldsFound = new Set();
     this.currentLine = 0;
@@ -55,6 +59,7 @@ export class FSMParser {
     
     this.checkRequiredFields(lines);
     this.parseFields(lines);
+    this.detectIndexingScheme();
     this.validateRules();
     
     return this.data as FSMData;
@@ -152,7 +157,7 @@ export class FSMParser {
         return i - 1;
       }
       
-      // Match patterns like "0: 0.1, 1.0" or "1. 0.2, 2.2"
+      // Match patterns like "0: 0.0, 1.1" or "1. 0.2, 2.2"
       const match = line.match(/(\d+)[:\.]?\s*(.+)/);
       if (!match) {
         throw new FSMValidationError(this.currentLine, `Invalid transition format: '${line}'`);
@@ -198,6 +203,12 @@ export class FSMParser {
     this.fieldsFound.add('acceptstate');
   }
 
+  private detectIndexingScheme(): void {
+    const transitionStates = Object.keys(this.data.transitions).map(k => parseInt(k, 10));
+    // If state 0 exists in transitions, we're using 0-based indexing
+    this.data.zeroIndexed = transitionStates.includes(0);
+  }
+
   private validateRules(): void {
     const missing = FSMParser.REQUIRED_FIELDS.filter(field => !this.fieldsFound.has(field));
     if (missing.length > 0) {
@@ -205,30 +216,64 @@ export class FSMParser {
     }
     
     const numStates = this.data.states!;
-    const numTransitions = Object.keys(this.data.transitions).length;
+    const transitionStates = Object.keys(this.data.transitions).map(k => parseInt(k, 10));
+    const numTransitions = transitionStates.length;
     
-    if (numTransitions !== numStates) {
-      throw new FSMValidationError(0, `Number of transitions (${numTransitions}) must equal number of states (${numStates})`);
+    // Determine expected states based on indexing scheme
+    const zeroIndexed = this.data.zeroIndexed;
+    const expectedStates = zeroIndexed 
+      ? Array.from({ length: numStates + 1 }, (_, i) => i) // 0 to states (inclusive)
+      : Array.from({ length: numStates }, (_, i) => i + 1); // 1 to states (inclusive)
+    
+    const expectedCount = expectedStates.length;
+    
+    if (numTransitions !== expectedCount) {
+      throw new FSMValidationError(0, 
+        `Number of transitions (${numTransitions}) must equal number of states (${expectedCount}). ` +
+        `Using ${zeroIndexed ? '0-based' : '1-based'} indexing. Expected states: ${expectedStates.join(', ')}`
+      );
     }
     
-    for (let stateNum = 1; stateNum <= numStates; stateNum++) {
+    // Check all expected states have transitions
+    for (const stateNum of expectedStates) {
       if (!(stateNum in this.data.transitions)) {
         throw new FSMValidationError(0, `State ${stateNum} has no transitions defined`);
       }
     }
     
-    if (this.data.startstate! < 1 || this.data.startstate! > numStates) {
-      throw new FSMValidationError(0, `Start state ${this.data.startstate} is invalid`);
+    // Validate start and accept states are within valid range
+    const minState = zeroIndexed ? 0 : 1;
+    const maxState = zeroIndexed ? numStates : numStates;
+    
+    if (this.data.startstate! < minState || this.data.startstate! > maxState) {
+      throw new FSMValidationError(0, 
+        `Start state ${this.data.startstate} is invalid. Must be between ${minState} and ${maxState}`
+      );
     }
     
-    if (this.data.acceptstate! < 1 || this.data.acceptstate! > numStates) {
-      throw new FSMValidationError(0, `Accept state ${this.data.acceptstate} is invalid`);
+    if (this.data.acceptstate! < minState || this.data.acceptstate! > maxState) {
+      throw new FSMValidationError(0, 
+        `Accept state ${this.data.acceptstate} is invalid. Must be between ${minState} and ${maxState}`
+      );
     }
     
+    // Validate each state has correct number of transitions (one per symbol)
     const numSymbols = this.data.symbols!.length;
     for (const [state, transitions] of Object.entries(this.data.transitions)) {
       if (transitions.length !== numSymbols) {
         throw new FSMValidationError(0, `State ${state} has ${transitions.length} transitions but ${numSymbols} symbols defined`);
+      }
+    }
+    
+    // Validate all transition targets are valid states
+    for (const [state, transitions] of Object.entries(this.data.transitions)) {
+      for (const [symbol, targetStr] of transitions) {
+        const target = parseInt(targetStr, 10);
+        if (target < minState || target > maxState) {
+          throw new FSMValidationError(0, 
+            `State ${state}: transition on '${symbol}' goes to invalid state ${target}. Must be between ${minState} and ${maxState}`
+          );
+        }
       }
     }
   }
@@ -243,11 +288,11 @@ export function runFSM(fsm: FSMData, input: string): {
   endState: number;
   error?: string;
 } {
-  // Build transition map
+  // Build transition map: key = "state,symbol" -> nextState
   const transitionMap: Record<string, number> = {};
   for (const [state, transitionList] of Object.entries(fsm.transitions)) {
     for (const [inputSymbol, nextState] of transitionList) {
-      const key = `${state}${inputSymbol}`;
+      const key = `${state},${inputSymbol}`;
       transitionMap[key] = parseInt(nextState, 10);
     }
   }
@@ -256,7 +301,7 @@ export function runFSM(fsm: FSMData, input: string): {
   const path: { state: number; symbol?: string }[] = [{ state: currentState }];
   
   for (const symbol of input) {
-    const key = `${currentState}${symbol}`;
+    const key = `${currentState},${symbol}`;
     
     if (!(key in transitionMap)) {
       return {
