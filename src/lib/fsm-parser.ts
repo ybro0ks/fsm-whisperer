@@ -177,7 +177,7 @@ export class FSMParser {
   }
 
   private parseTransitionLine(line: string): void {
-    // Match patterns like "0: 0.0, 1.1" or "1. 0.2, 2.2" or "1: 0.1, 1.1"
+    // Match state number at start: "1: ..." or "1. ..."
     const match = line.match(/(\d+)[:\.]?\s*(.+)/);
     if (!match) {
       throw new FSMValidationError(this.currentLine, `Invalid transition format: '${line}'`);
@@ -187,15 +187,33 @@ export class FSMParser {
     const transitionsStr = match[2];
     
     const transitions: [string, string][] = [];
-    for (const trans of transitionsStr.split(',')) {
-      const trimmed = trans.trim();
-      if (trimmed.includes('.')) {
-        const parts = trimmed.split('.');
-        if (parts.length !== 2) {
-          throw new FSMValidationError(this.currentLine, `Invalid transition '${trimmed}'`);
+    
+    // Try new format first: on '0' move '1', on '1' move '2'
+    // Pattern: on 'symbol' move 'target' (case-insensitive, handles typos like "mocve")
+    const newFormatPattern = /on\s*['"](\d+)['"]\s*\.?\s*m\w*\s*['"](\d+)['"]/gi;
+    let newFormatMatch;
+    
+    while ((newFormatMatch = newFormatPattern.exec(transitionsStr)) !== null) {
+      const symbol = newFormatMatch[1];
+      const target = newFormatMatch[2];
+      transitions.push([symbol, target]);
+    }
+    
+    // If new format didn't match, try old format: 0.1, 1.2
+    if (transitions.length === 0) {
+      for (const trans of transitionsStr.split(',')) {
+        const trimmed = trans.trim();
+        if (trimmed.includes('.')) {
+          const parts = trimmed.split('.');
+          if (parts.length === 2 && /^\d+$/.test(parts[0].trim()) && /^\d+$/.test(parts[1].trim())) {
+            transitions.push([parts[0].trim(), parts[1].trim()]);
+          }
         }
-        transitions.push([parts[0].trim(), parts[1].trim()]);
       }
+    }
+    
+    if (transitions.length === 0) {
+      throw new FSMValidationError(this.currentLine, `No valid transitions found in: '${line}'`);
     }
     
     this.data.transitions[state] = transitions;
