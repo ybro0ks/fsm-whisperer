@@ -106,10 +106,50 @@ export default function GenerateStatesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-muted/50 rounded-lg p-4 overflow-auto max-h-[500px]">
-                  <pre className="font-mono text-sm text-foreground whitespace-pre-wrap">
-                    {JSON.stringify(result, null, 2)}
-                  </pre>
+                <div className="space-y-4 max-h-[500px] overflow-auto">
+                  {result.steps.map((step) => (
+                    <div key={step.position} className="space-y-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-1 rounded text-xs font-mono ${
+                          step.isAnchor 
+                            ? 'bg-warning/20 text-warning-foreground border border-warning' 
+                            : 'bg-primary/20 text-primary'
+                        }`}>
+                          Position {step.position}{step.isAnchor ? ' (Anchor)' : ''}
+                        </span>
+                        <span className="text-muted-foreground text-sm">Symbol: <code className="font-mono bg-muted px-1 rounded">{step.symbol}</code></span>
+                      </div>
+                      <div className="grid gap-2 pl-2">
+                        {step.states.map((state) => (
+                          <div 
+                            key={state.currentState} 
+                            className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-lg border border-border/50"
+                          >
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Current State</p>
+                              <p className="font-mono font-medium text-foreground">q{state.currentState}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Input</p>
+                              <p className="font-mono font-medium text-foreground">{step.symbol}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Next State</p>
+                              <p className={`font-mono font-medium ${state.nextState !== null ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                {state.nextState !== null ? `q${state.nextState}` : '—'}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Next Input</p>
+                              <p className={`font-mono font-medium ${state.upcomingInput !== null ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                {state.upcomingInput ?? '—'}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
