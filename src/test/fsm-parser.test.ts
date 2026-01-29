@@ -1,17 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { parseFSMFile, runFSM } from '@/lib/fsm-parser';
 
-describe('FSM Parser - 1-based indexing', () => {
-  // New readable format: on '0' move '1' means "on input 0, move to state 1"
+describe('FSM Parser - JSON-like format', () => {
+  // JSON-like format: { "symbol": targetState }
   const userFile = `Name = "divby4fsm"
+
 states = 4
+
 symbols = {0, 1}
-transitions =   1: on '0' Move '1', on '1' Move '1'
-		2: on '0' move '2', on '1' Move '3'
-		3. On '0' move '1', on '1' move '1'
-		4. On '0' move '2', on '1' move '3'
-		
+
+transitions = {
+  1: { "0": 1, "1": 1 },
+  2: { "0": 2, "1": 3 },
+  3: { "0": 1, "1": 1 },
+  4: { "0": 2, "1": 3 }
+}
+
 startstate = 1
+
 acceptstate = 1`;
 
   it('should parse the user file correctly', () => {
