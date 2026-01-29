@@ -59,7 +59,7 @@ export class FSMParser {
     
     this.checkRequiredFields(lines);
     this.parseFields(lines);
-    this.detectIndexingScheme();
+    this.detectAndNormalizeIndexingScheme();
     this.validateRules();
     
     return this.data as FSMData;
@@ -203,10 +203,65 @@ export class FSMParser {
     this.fieldsFound.add('acceptstate');
   }
 
-  private detectIndexingScheme(): void {
+  /**
+   * Detect indexing scheme and normalize a common "shifted" format:
+   * - states is a COUNT (N)
+   * - transition rows are labeled 1..N
+   * - but transition targets are 0..N-1
+   * In that case we normalize row labels (and start/accept) by -1 and treat as 0-based.
+   */
+  private detectAndNormalizeIndexingScheme(): void {
     const transitionStates = Object.keys(this.data.transitions).map(k => parseInt(k, 10));
-    // If state 0 exists in transitions, we're using 0-based indexing
-    this.data.zeroIndexed = transitionStates.includes(0);
+    if (transitionStates.length === 0) {
+      this.data.zeroIndexed = false;
+      return;
+    }
+
+    const numStates = this.data.states ?? 0;
+    const minFrom = Math.min(...transitionStates);
+    const maxFrom = Math.max(...transitionStates);
+
+    // Gather all target states
+    const targetStates: number[] = [];
+    for (const transitions of Object.values(this.data.transitions)) {
+      for (const [, targetStr] of transitions) {
+        const t = parseInt(targetStr, 10);
+        if (!Number.isNaN(t)) targetStates.push(t);
+      }
+    }
+    const minTo = targetStates.length ? Math.min(...targetStates) : Number.POSITIVE_INFINITY;
+    const maxTo = targetStates.length ? Math.max(...targetStates) : Number.NEGATIVE_INFINITY;
+
+    // Case A: explicit 0-based (row 0 exists)
+    if (transitionStates.includes(0)) {
+      this.data.zeroIndexed = true;
+      return;
+    }
+
+    // Case B: shifted-from-states normalization (1..N rows, 0..N-1 targets)
+    const looksShifted =
+      numStates > 0 &&
+      minFrom === 1 &&
+      maxFrom === numStates &&
+      minTo === 0 &&
+      maxTo === numStates - 1;
+
+    if (looksShifted) {
+      const normalized: Record<number, [string, string][]> = {};
+      for (const [fromStr, transitions] of Object.entries(this.data.transitions)) {
+        const from = parseInt(fromStr, 10);
+        normalized[from - 1] = transitions;
+      }
+      this.data.transitions = normalized;
+      // Start/accept were authored in the same label space as the row labels
+      if (this.data.startstate !== null) this.data.startstate = this.data.startstate - 1;
+      if (this.data.acceptstate !== null) this.data.acceptstate = this.data.acceptstate - 1;
+      this.data.zeroIndexed = true;
+      return;
+    }
+
+    // Default: 1-based
+    this.data.zeroIndexed = false;
   }
 
   private validateRules(): void {
@@ -222,8 +277,8 @@ export class FSMParser {
     // Determine expected states based on indexing scheme
     const zeroIndexed = this.data.zeroIndexed;
     const expectedStates = zeroIndexed 
-      ? Array.from({ length: numStates + 1 }, (_, i) => i) // 0 to states (inclusive)
-      : Array.from({ length: numStates }, (_, i) => i + 1); // 1 to states (inclusive)
+      ? Array.from({ length: numStates }, (_, i) => i) // 0..states-1
+      : Array.from({ length: numStates }, (_, i) => i + 1); // 1..states
     
     const expectedCount = expectedStates.length;
     
@@ -243,7 +298,7 @@ export class FSMParser {
     
     // Validate start and accept states are within valid range
     const minState = zeroIndexed ? 0 : 1;
-    const maxState = zeroIndexed ? numStates : numStates;
+    const maxState = zeroIndexed ? numStates - 1 : numStates;
     
     if (this.data.startstate! < minState || this.data.startstate! > maxState) {
       throw new FSMValidationError(0, 

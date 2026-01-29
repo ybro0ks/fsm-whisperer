@@ -17,7 +17,8 @@ export default function FSMVisualizer({ fsm, currentState, highlightedTransition
   // Calculate state positions in a circle
   // Support both 0-based and 1-based indexing
   const statePositions: Record<number, { x: number; y: number }> = {};
-  const numStates = fsm.zeroIndexed ? fsm.states + 1 : fsm.states;
+  // fsm.states is a COUNT. If zeroIndexed, states are 0..states-1. If 1-based, 1..states.
+  const numStates = fsm.states;
   const startIndex = fsm.zeroIndexed ? 0 : 1;
   
   for (let i = 0; i < numStates; i++) {
