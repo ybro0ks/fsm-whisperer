@@ -141,7 +141,19 @@ export class FSMParser {
 
   private parseTransitions(lines: string[], startIdx: number): number {
     this.fieldsFound.add('transitions');
-    let i = startIdx + 1;
+    
+    // Check if the first transition is on the same line as "transitions ="
+    const firstLine = lines[startIdx].trim();
+    const inlineMatch = firstLine.match(/transitions\s*=\s*(\d+[:\.]?\s*.+)/i);
+    
+    let i = startIdx;
+    if (inlineMatch) {
+      // Parse inline transition on same line as "transitions ="
+      this.currentLine = startIdx + 1;
+      this.parseTransitionLine(inlineMatch[1]);
+    }
+    
+    i = startIdx + 1;
     
     while (i < lines.length) {
       const line = lines[i].trim();
@@ -157,32 +169,36 @@ export class FSMParser {
         return i - 1;
       }
       
-      // Match patterns like "0: 0.0, 1.1" or "1. 0.2, 2.2"
-      const match = line.match(/(\d+)[:\.]?\s*(.+)/);
-      if (!match) {
-        throw new FSMValidationError(this.currentLine, `Invalid transition format: '${line}'`);
-      }
-      
-      const state = parseInt(match[1], 10);
-      const transitionsStr = match[2];
-      
-      const transitions: [string, string][] = [];
-      for (const trans of transitionsStr.split(',')) {
-        const trimmed = trans.trim();
-        if (trimmed.includes('.')) {
-          const parts = trimmed.split('.');
-          if (parts.length !== 2) {
-            throw new FSMValidationError(this.currentLine, `Invalid transition '${trimmed}'`);
-          }
-          transitions.push([parts[0].trim(), parts[1].trim()]);
-        }
-      }
-      
-      this.data.transitions[state] = transitions;
+      this.parseTransitionLine(line);
       i++;
     }
     
     return i;
+  }
+
+  private parseTransitionLine(line: string): void {
+    // Match patterns like "0: 0.0, 1.1" or "1. 0.2, 2.2" or "1: 0.1, 1.1"
+    const match = line.match(/(\d+)[:\.]?\s*(.+)/);
+    if (!match) {
+      throw new FSMValidationError(this.currentLine, `Invalid transition format: '${line}'`);
+    }
+    
+    const state = parseInt(match[1], 10);
+    const transitionsStr = match[2];
+    
+    const transitions: [string, string][] = [];
+    for (const trans of transitionsStr.split(',')) {
+      const trimmed = trans.trim();
+      if (trimmed.includes('.')) {
+        const parts = trimmed.split('.');
+        if (parts.length !== 2) {
+          throw new FSMValidationError(this.currentLine, `Invalid transition '${trimmed}'`);
+        }
+        transitions.push([parts[0].trim(), parts[1].trim()]);
+      }
+    }
+    
+    this.data.transitions[state] = transitions;
   }
 
   private parseStartState(line: string): void {
