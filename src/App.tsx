@@ -8,6 +8,7 @@ import UploadPage from "./pages/UploadPage";
 import ActionsPage from "./pages/ActionsPage";
 import TestFSMPage from "./pages/TestFSMPage";
 import GenerateStatesPage from "./pages/GenerateStatesPage";
+import GenerateExcelPage from "./pages/GenerateExcelPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/actions" element={<ActionsPage />} />
             <Route path="/test-fsm" element={<TestFSMPage />} />
             <Route path="/generate-states" element={<GenerateStatesPage />} />
+            <Route path="/generate-excel" element={<GenerateExcelPage />} />
             <Route path="/placeholder/:feature" element={<PlaceholderPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
