@@ -89,13 +89,12 @@ export default function ActionsPage() {
         </Button>
 
         <Button
-          onClick={() => navigate('/placeholder/generate-excel')}
-          variant="secondary"
+          onClick={() => navigate('/generate-excel')}
           className="w-full h-14 text-base font-medium justify-start px-6"
         >
           <FileSpreadsheet className="w-5 h-5 mr-4" />
           Generate Excel Sheet
-          <span className="ml-auto text-secondary-foreground/50 text-sm">Coming soon</span>
+          <span className="ml-auto text-primary-foreground/70 text-sm">Export data</span>
         </Button>
       </div>
 
