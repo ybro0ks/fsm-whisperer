@@ -14,19 +14,34 @@ export default function FSMVisualizer({ fsm, currentState, highlightedTransition
   const radius = 130;
   const stateRadius = 30;
 
-  // Calculate state positions in a circle
+  // Calculate state positions in a grid layout for tidier visualization
   // Support both 0-based and 1-based indexing
   const statePositions: Record<number, { x: number; y: number }> = {};
-  // fsm.states is a COUNT. If zeroIndexed, states are 0..states-1. If 1-based, 1..states.
   const numStates = fsm.states;
   const startIndex = fsm.zeroIndexed ? 0 : 1;
   
+  // Calculate grid dimensions - prefer square-ish layouts
+  const cols = Math.ceil(Math.sqrt(numStates));
+  const rows = Math.ceil(numStates / cols);
+  
+  // Calculate spacing to fit within the viewport
+  const horizontalSpacing = Math.min(140, (width - 120) / cols);
+  const verticalSpacing = Math.min(120, (height - 120) / rows);
+  
+  // Calculate starting position to center the grid
+  const gridWidth = (cols - 1) * horizontalSpacing;
+  const gridHeight = (rows - 1) * verticalSpacing;
+  const startX = centerX - gridWidth / 2;
+  const startY = centerY - gridHeight / 2;
+  
   for (let i = 0; i < numStates; i++) {
     const stateNum = startIndex + i;
-    const angle = (2 * Math.PI * i / numStates) - (Math.PI / 2);
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    
     statePositions[stateNum] = {
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle),
+      x: startX + col * horizontalSpacing,
+      y: startY + row * verticalSpacing,
     };
   }
 
