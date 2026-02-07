@@ -188,25 +188,38 @@ export default function TestFSMPage() {
                   {/* Path display */}
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground mb-1">Execution Path</p>
-                    <div className="flex items-center gap-1 font-mono text-sm">
-                      {result.path.map((step, idx) => (
-                        <span key={idx} className="flex items-center">
-                          <span 
-                            className={`px-2 py-1 rounded ${
-                              idx === currentStep && isAnimating
-                                ? 'bg-warning text-warning-foreground'
-                                : idx < currentStep || !isAnimating
-                                  ? 'bg-primary/20 text-primary'
-                                  : 'bg-muted text-muted-foreground'
-                            }`}
-                          >
-                            q{step.state}
+                    <div className="flex items-center gap-1 font-mono text-sm flex-wrap justify-end">
+                      {result.path.map((step, idx) => {
+                        const isAcceptState = step.state === fsmData.acceptstate;
+                        const isCurrentAnimating = idx === currentStep && isAnimating;
+                        const isPast = idx < currentStep || !isAnimating;
+                        
+                        return (
+                          <span key={idx} className="flex items-center">
+                            <span 
+                              className={`px-2 py-1 rounded flex items-center gap-1 ${
+                                isCurrentAnimating
+                                  ? 'bg-warning text-warning-foreground'
+                                  : isPast
+                                    ? isAcceptState 
+                                      ? 'bg-success/20 text-success border border-success/30'
+                                      : 'bg-destructive/20 text-destructive border border-destructive/30'
+                                    : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              q{step.state}
+                              {isPast && !isCurrentAnimating && (
+                                isAcceptState 
+                                  ? <CheckCircle className="w-3 h-3" />
+                                  : <XCircle className="w-3 h-3" />
+                              )}
+                            </span>
+                            {idx < result.path.length - 1 && (
+                              <span className="text-muted-foreground mx-1">→</span>
+                            )}
                           </span>
-                          {idx < result.path.length - 1 && (
-                            <span className="text-muted-foreground mx-1">→</span>
-                          )}
-                        </span>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
