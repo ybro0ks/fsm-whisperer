@@ -268,10 +268,11 @@ function generateReagentsAndTilesSheet(
   const { experiments, stockConcentration, targetConcentration, totalVolume } = params;
   const data: (string | number | null)[][] = [];
 
-  // Generate competing tiles per experiment using step generator logic
-  const competingTilesPerExp = experiments.map(exp => 
-    generateCompetingTilesFromSteps(fsmData, exp.fsmInput).flat()
+  // Generate competing tiles per experiment using step generator logic (grouped by position)
+  const competingTilesByPositionPerExp = experiments.map(exp => 
+    generateCompetingTilesFromSteps(fsmData, exp.fsmInput)
   );
+  const competingTilesPerExp = competingTilesByPositionPerExp.map(positions => positions.flat());
   // Get correct tiles per experiment for control columns
   const correctTilesPerExp = experiments.map(exp => getCorrectTiles(fsmData, exp.fsmInput));
   const defaultStock = stockConcentration || 50;
