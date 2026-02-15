@@ -68,15 +68,24 @@ export function generateFSMSteps(fsmData: FSMData, input: string): GenerationRes
 
     const stateResults: StateStep[] = [];
 
-    // Iterate through all states (1-based indexing)
-    for (let stateNum = 1; stateNum <= fsmData.states; stateNum++) {
-      const nextState = getTransition(fsmData, stateNum, symbol);
-      
+    if (isAnchor) {
+      // Anchor position: only show the start state (state 1)
+      const nextState = getTransition(fsmData, fsmData.startstate, symbol);
       stateResults.push({
-        currentState: stateNum,
+        currentState: fsmData.startstate,
         nextState: nextState,
         upcomingInput: upcomingInput,
       });
+    } else {
+      // Non-anchor: iterate through all states for competing tiles
+      for (let stateNum = 1; stateNum <= fsmData.states; stateNum++) {
+        const nextState = getTransition(fsmData, stateNum, symbol);
+        stateResults.push({
+          currentState: stateNum,
+          nextState: nextState,
+          upcomingInput: upcomingInput,
+        });
+      }
     }
 
     steps.push({
