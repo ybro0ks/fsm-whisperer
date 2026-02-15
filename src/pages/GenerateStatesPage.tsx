@@ -106,6 +106,23 @@ export default function GenerateStatesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Competitive Complexity Summary */}
+                <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border/50">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Competitive Complexity</p>
+                  <div className="flex flex-wrap gap-2">
+                    {result.steps.map((step) => {
+                      const posLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                      const tilesWithTransition = step.states.filter(s => s.nextState !== null).length;
+                      return (
+                        <div key={step.position} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-background rounded border border-border text-sm font-mono">
+                          <span className="text-muted-foreground">{posLabels[step.position]}:</span>
+                          <span className="font-semibold text-foreground">{tilesWithTransition}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="space-y-4 max-h-[500px] overflow-auto">
                   {result.steps.map((step) => (
                     <div key={step.position} className="space-y-2">
@@ -118,6 +135,9 @@ export default function GenerateStatesPage() {
                           Position {step.position}{step.isAnchor ? ' (Anchor)' : ''}
                         </span>
                         <span className="text-muted-foreground text-sm">Symbol: <code className="font-mono bg-muted px-1 rounded">{step.symbol}</code></span>
+                        <span className="text-muted-foreground text-xs ml-auto font-mono">
+                          {step.states.filter(s => s.nextState !== null).length} competing tile{step.states.filter(s => s.nextState !== null).length !== 1 ? 's' : ''}
+                        </span>
                       </div>
                       <div className="grid gap-2 pl-2">
                         {step.states.map((state) => (
