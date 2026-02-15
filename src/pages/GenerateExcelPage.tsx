@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useFSM } from '@/lib/fsm-context';
 import { evaluateFSM, generateExcelWorkbook, downloadExcel, generateFilename, ExperimentInput } from '@/lib/excel-generator';
 
-type Step = 'count' | 'buffer' | 'experiments' | 'concentrations' | 'generate';
+type Step = 'count' | 'experiments' | 'concentrations' | 'generate';
 
 interface ExperimentData {
   name: string;
@@ -28,7 +28,7 @@ export default function GenerateExcelPage() {
   
   // Form data
   const [experimentCount, setExperimentCount] = useState<number>(1);
-  const [bufferName, setBufferName] = useState<string>('5RF (ATTO) 79nM');
+  const [bufferName] = useState<string>('5RF (ATTO) 79nM');
   const [experiments, setExperiments] = useState<ExperimentData[]>([]);
   const [stockConcentration, setStockConcentration] = useState<number>(50);
   const [targetConcentration, setTargetConcentration] = useState<number>(1);
@@ -115,13 +115,11 @@ export default function GenerateExcelPage() {
           return;
         }
         initializeExperiments();
-        setCurrentStep('buffer');
-        break;
-      case 'buffer':
-        if (!bufferName.trim()) {
-          setBufferName('5RF (ATTO) 79nM');
-        }
         setCurrentStep('experiments');
+        break;
+      case 'experiments':
+        if (!validateExperiments()) return;
+        setCurrentStep('concentrations');
         break;
       case 'experiments':
         if (!validateExperiments()) return;
@@ -144,11 +142,8 @@ export default function GenerateExcelPage() {
   const handleBack = () => {
     setError(null);
     switch (currentStep) {
-      case 'buffer':
-        setCurrentStep('count');
-        break;
       case 'experiments':
-        setCurrentStep('buffer');
+        setCurrentStep('count');
         break;
       case 'concentrations':
         setCurrentStep('experiments');
@@ -192,15 +187,13 @@ export default function GenerateExcelPage() {
 
   const stepTitles: Record<Step, string> = {
     count: 'Step 1: Number of Experiments',
-    buffer: 'Step 2: Buffer Name',
-    experiments: 'Step 3: Experiment Details',
-    concentrations: 'Step 4: Concentration & Volume',
-    generate: 'Step 5: Generate Excel File',
+    experiments: 'Step 2: Experiment Details',
+    concentrations: 'Step 3: Concentration & Volume',
+    generate: 'Step 4: Generate Excel File',
   };
 
   const stepDescriptions: Record<Step, string> = {
     count: 'How many experiments are being performed?',
-    buffer: 'Enter the buffer name (press Enter for default)',
     experiments: 'Enter details for each experiment including fluorophore',
     concentrations: 'Enter concentration and volume parameters',
     generate: 'Review and generate your Excel file',
@@ -229,20 +222,20 @@ export default function GenerateExcelPage() {
       {/* Progress Indicator */}
       <div className="w-full max-w-2xl mb-6">
         <div className="flex justify-between items-center">
-          {(['count', 'buffer', 'experiments', 'concentrations', 'generate'] as Step[]).map((step, idx) => (
+          {(['count', 'experiments', 'concentrations', 'generate'] as Step[]).map((step, idx) => (
             <div key={step} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 currentStep === step 
                   ? 'bg-primary text-primary-foreground' 
-                  : idx < ['count', 'buffer', 'experiments', 'concentrations', 'generate'].indexOf(currentStep)
+                  : idx < ['count', 'experiments', 'concentrations', 'generate'].indexOf(currentStep)
                     ? 'bg-primary/20 text-primary'
                     : 'bg-muted text-muted-foreground'
               }`}>
                 {idx + 1}
               </div>
-              {idx < 4 && (
+              {idx < 3 && (
                 <div className={`w-12 md:w-24 h-0.5 mx-1 ${
-                  idx < ['count', 'buffer', 'experiments', 'concentrations', 'generate'].indexOf(currentStep)
+                  idx < ['count', 'experiments', 'concentrations', 'generate'].indexOf(currentStep)
                     ? 'bg-primary/40'
                     : 'bg-muted'
                 }`} />
@@ -284,23 +277,6 @@ export default function GenerateExcelPage() {
             </div>
           )}
 
-          {currentStep === 'buffer' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="bufferName">Buffer Name</Label>
-                <Input
-                  id="bufferName"
-                  placeholder="5RF (ATTO) 79nM"
-                  value={bufferName}
-                  onChange={(e) => setBufferName(e.target.value)}
-                  className="font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Default: 5RF (ATTO) 79nM
-                </p>
-              </div>
-            </div>
-          )}
 
           {currentStep === 'experiments' && (
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
