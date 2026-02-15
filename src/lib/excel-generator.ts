@@ -154,9 +154,9 @@ export function generateExcelWorkbook(
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
 
-  // Generate Sheet 1: Experiment_Layout
+  // Generate Sheet 1: qpcr_layout
   const sheet1 = generateExperimentLayoutSheet(params);
-  XLSX.utils.book_append_sheet(wb, sheet1, 'Experiment_Layout');
+  XLSX.utils.book_append_sheet(wb, sheet1, 'qpcr_layout');
 
   // Generate Sheet 2: Reagents_and_Tiles
   const sheet2 = generateReagentsAndTilesSheet(params, fsmData);
@@ -235,190 +235,103 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
 
 /**
  * Generate Reagents_and_Tiles sheet
+ * Layout: Vertical sections for Buffer, then each experiment
+ * Each section has two side-by-side blocks (Experiment + Repeat)
  */
 function generateReagentsAndTilesSheet(
   params: ExcelGenerationParams,
   fsmData: FSMData
 ): XLSX.WorkSheet {
-  const { experiments, stockConcentration, targetConcentration, totalVolume } = params;
+  const { experiments, totalVolume } = params;
   const data: (string | number | null)[][] = [];
 
-  // Get competing tiles from FSM
-  const competingTiles = generateCompetingTiles(fsmData);
+  // ---- Buffer Section ----
+  // Header row
+  const bufferHeader: (string | null)[] = ['Buffer', null, null, null, null, null, 'Buffer', null, null, null, null];
+  data.push(bufferHeader);
 
-  // Build all tiles list - A1* first, then competing tiles
-  const allTiles = ['A1*', ...competingTiles.filter(t => t !== 'A1*')];
+  // Column headers
+  const colHeaders = ['Species', 'Stock conc', 'Target conc', 'Volume', 'Exact num droplets'];
+  data.push([...colHeaders, null, ...colHeaders]);
 
-  // For each experiment, we create two column groups: Experiment and Repeat Experiment
-  // Each group has columns: Species, Stock Conc, Target Conc, Volume to Move, Exact Num Droplets
+  // Buffer reagents: 0.1x tween and 1x TAE
+  const bufferReagents = [
+    { name: '0.1x tween', stock: 'N/A', target: 'N/A', volume: 3500, droplets: 140 },
+    { name: '1x TAE', stock: 'N/A', target: 'N/A', volume: 31500, droplets: 1260 },
+  ];
 
-  // Row 1: Empty row for spacing
+  for (const reagent of bufferReagents) {
+    data.push([
+      reagent.name, reagent.stock, reagent.target, reagent.volume, reagent.droplets,
+      null,
+      reagent.name, reagent.stock, reagent.target, reagent.volume, reagent.droplets,
+    ]);
+  }
+
+  // Buffer total
+  const bufferTotal = bufferReagents.reduce((sum, r) => sum + r.volume, 0);
+  data.push(['Total', null, null, bufferTotal, null, null, 'Total', null, null, bufferTotal, null]);
+
+  // Spacer
+  data.push([]);
   data.push([]);
 
-  // Row 2: Group headers - "Experiment" and "Repeat Experiment"
-  const groupHeaderRow: (string | null)[] = [];
-  for (let i = 0; i < experiments.length; i++) {
-    groupHeaderRow.push('Experiment', null, null, null, null);
-    groupHeaderRow.push('Repeat Experiment', null, null, null, null);
-  }
-  data.push(groupHeaderRow);
+  // ---- Experiment Sections ----
+  for (const exp of experiments) {
+    const sectionName = `${exp.name}; ${exp.fluorophore}`;
 
-  // Row 3: Experiment name row
-  const expNameRow: (string | null)[] = [];
-  for (let i = 0; i < experiments.length; i++) {
-    const exp = experiments[i];
-    expNameRow.push(`${exp.name}`, 'Stock Conc (uM)', 'Target conc (uM)', 'Volume to move (nL)', 'Exact num droplets');
-    expNameRow.push(`${exp.name}`, 'Stock Conc (uM)', 'Target conc (uM)', 'Volume to move (nL)', 'Exact num droplets');
-  }
-  data.push(expNameRow);
+    // Section header
+    data.push([sectionName, null, null, null, null, null, sectionName, null, null, null, null]);
 
-  // Calculate values for each tile
-  const defaultStock = stockConcentration || 50;
+    // Column headers
+    data.push([...colHeaders, null, ...colHeaders]);
 
-  // Add tile rows
-  for (const tile of allTiles) {
-    const row: (string | number)[] = [];
+    // Experiment-specific reagent: 5RF 10uM
+    const fiveRF = {
+      name: '5RF 10uM',
+      stock: 10,
+      target: 0.07857,
+      volume: 275,
+      droplets: 11,
+    };
 
-    for (let i = 0; i < experiments.length; i++) {
-      const exp = experiments[i];
-      const correctTiles = getCorrectTiles(fsmData, exp.fsmInput);
+    data.push([
+      fiveRF.name, fiveRF.stock, fiveRF.target, fiveRF.volume, fiveRF.droplets,
+      null,
+      fiveRF.name, fiveRF.stock, fiveRF.target, fiveRF.volume, fiveRF.droplets,
+    ]);
 
-      // Experiment column - includes all tiles
-      const volToMove = calculateVolumeToMove(targetConcentration, totalVolume, defaultStock);
-      const droplets = calculateDroplets(volToMove);
+    // Same buffer reagents
+    const expBufferReagents = [
+      { name: '0.1x tween', stock: 'N/A', target: 'N/A', volume: 3500, droplets: 140 },
+      { name: '1x TAE', stock: 'N/A', target: 'N/A', volume: 31500, droplets: 1249 },
+    ];
 
-      row.push(tile);
-      row.push(defaultStock);
-      row.push(targetConcentration);
-      row.push(Math.round(volToMove * 100) / 100);
-      row.push(Math.round(droplets * 1000) / 1000);
-
-      // Repeat Experiment column - same values
-      row.push(tile);
-      row.push(defaultStock);
-      row.push(targetConcentration);
-      row.push(Math.round(volToMove * 100) / 100);
-      row.push(Math.round(droplets * 1000) / 1000);
+    for (const reagent of expBufferReagents) {
+      data.push([
+        reagent.name, reagent.stock, reagent.target, reagent.volume, reagent.droplets,
+        null,
+        reagent.name, reagent.stock, reagent.target, reagent.volume, reagent.droplets,
+      ]);
     }
 
-    data.push(row);
+    // Experiment total
+    const expTotal = fiveRF.volume + expBufferReagents.reduce((sum, r) => sum + r.volume, 0);
+    data.push(['Total', null, null, totalVolume || expTotal, null, null, 'Total', null, null, totalVolume || expTotal, null]);
+
+    // Spacer between experiments
+    data.push([]);
+    data.push([]);
   }
-
-  // Add scaffold reagents
-  for (const reagent of SCAFFOLD_REAGENTS) {
-    const row: (string | number | null)[] = [];
-
-    for (let i = 0; i < experiments.length; i++) {
-      const stock = reagent.stockConcentration;
-      const target = reagent.targetConcentration;
-
-      if (target === null) {
-        // N/A for target concentration
-        row.push(reagent.name);
-        row.push(stock);
-        row.push('N/A');
-        // Use fixed values for these reagents
-        if (reagent.name === '10x MG++') {
-          row.push(8);
-          row.push(0.32);
-        } else {
-          const vol = calculateVolumeToMove(1, totalVolume, stock);
-          row.push(Math.round(vol * 100000000) / 100000000);
-          row.push(Math.round(calculateDroplets(vol) * 1000000000) / 1000000000);
-        }
-      } else {
-        const vol = calculateVolumeToMove(target, totalVolume, stock);
-        const drops = calculateDroplets(vol);
-        row.push(reagent.name);
-        row.push(stock);
-        row.push(target);
-        row.push(Math.round(vol * 100000000) / 100000000);
-        row.push(Math.round(drops * 100000000) / 100000000);
-      }
-
-      // Repeat Experiment column - same structure
-      if (target === null) {
-        row.push(reagent.name);
-        row.push(stock);
-        row.push('N/A');
-        if (reagent.name === '10x MG++') {
-          row.push(3.5);
-          row.push(0.14);
-        } else {
-          const vol = calculateVolumeToMove(1, totalVolume, stock);
-          row.push(Math.round(vol * 100000000) / 100000000);
-          row.push(Math.round(calculateDroplets(vol) * 1000000000) / 1000000000);
-        }
-      } else {
-        const vol = calculateVolumeToMove(target, totalVolume, stock);
-        const drops = calculateDroplets(vol);
-        row.push(reagent.name);
-        row.push(stock);
-        row.push(target);
-        row.push(Math.round(vol * 100000000) / 100000000);
-        row.push(Math.round(drops * 100000000) / 100000000);
-      }
-    }
-
-    data.push(row);
-  }
-
-  // Add Total row
-  const totalRow: (string | number)[] = [];
-  for (let i = 0; i < experiments.length; i++) {
-    // Calculate total target concentration for experiment
-    const tileCount = allTiles.length;
-    const reagentTotal = SCAFFOLD_REAGENTS.reduce((sum, r) => sum + (r.targetConcentration || 0), 0);
-    const tileTotal = tileCount * targetConcentration;
-    const total = tileTotal + reagentTotal;
-
-    totalRow.push('Total');
-    totalRow.push('');
-    totalRow.push('');
-    totalRow.push(Math.round(total * 100) / 100);
-    totalRow.push('');
-
-    // Repeat column
-    totalRow.push('Total');
-    totalRow.push('');
-    totalRow.push('');
-    totalRow.push(Math.round(total * 100) / 100);
-    totalRow.push('');
-  }
-  data.push(totalRow);
-
-  // Add Buffer section
-  data.push([]);
-  data.push([]);
-
-  const bufferHeaderRow: (string | null)[] = [];
-  for (let i = 0; i < experiments.length; i++) {
-    bufferHeaderRow.push('Buffer', null, null, null, null);
-    bufferHeaderRow.push('Buffer', null, null, null, null);
-  }
-  data.push(bufferHeaderRow);
-
-  const bufferColHeaders: string[] = [];
-  for (let i = 0; i < experiments.length; i++) {
-    bufferColHeaders.push('Species', 'Stock conc (nM)', 'Target conc (nM)', 'Volume to move (nL)', 'Exact num droplets');
-    bufferColHeaders.push('Species', 'Stock conc (nM)', 'Target conc (nM)', 'Volume to move (nL)', 'Exact num droplets');
-  }
-  data.push(bufferColHeaders);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   // Set column widths
-  const numCols = experiments.length * 10;
-  const colWidths: { wch: number }[] = [];
-  for (let i = 0; i < numCols; i++) {
-    const colType = i % 5;
-    if (colType === 0) {
-      colWidths.push({ wch: 22 }); // Species/Tile name
-    } else {
-      colWidths.push({ wch: 18 }); // Other columns
-    }
-  }
-  ws['!cols'] = colWidths;
+  ws['!cols'] = [
+    { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 18 },
+    { wch: 4 },  // spacer column
+    { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 18 },
+  ];
 
   return ws;
 }
