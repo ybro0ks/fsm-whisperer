@@ -59,27 +59,24 @@ function generateCompetingTilesByPosition(fsmData: FSMData, inputLength: number)
   const positionLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
   const result: string[][] = [];
 
-  // Position A: anchor tile
-  result.push(['A1*']);
+  // Position A: anchor - no competing tiles, just the transitions from start state
+  // Format: A<toState> (fromState is always start state, so omitted)
+  const anchorTiles: string[] = [];
+  const startTransitions = fsmData.transitions[fsmData.startstate];
+  if (startTransitions) {
+    for (const [, nextState] of startTransitions) {
+      const nextStateNum = parseInt(nextState, 10);
+      const tile = `A${nextStateNum}`;
+      if (!anchorTiles.includes(tile)) {
+        anchorTiles.push(tile);
+      }
+    }
+  }
+  result.push(anchorTiles);
 
   // For each subsequent position, generate all possible competing tiles
   for (let pos = 1; pos < inputLength; pos++) {
     const posLabel = positionLabels[pos];
-    const tiles: string[] = [];
-
-    // For each state, list all transitions as competing tiles at this position
-    for (let state = 1; state <= fsmData.states; state++) {
-      const stateTransitions = fsmData.transitions[state];
-      if (stateTransitions) {
-        for (const [, nextState] of stateTransitions) {
-          const nextStateNum = parseInt(nextState, 10);
-          const tile = `${state}${posLabel}${nextStateNum}`;
-          if (!tiles.includes(tile)) {
-            tiles.push(tile);
-          }
-        }
-      }
-    }
 
     // Final position: no toState, just <fromState><posLabel>
     if (pos === inputLength - 1) {
@@ -89,6 +86,20 @@ function generateCompetingTilesByPosition(fsmData: FSMData, inputLength: number)
       }
       result.push(finalTiles);
     } else {
+      // Competing tiles: <fromState><posLabel><toState> for all states and transitions
+      const tiles: string[] = [];
+      for (let state = 1; state <= fsmData.states; state++) {
+        const stateTransitions = fsmData.transitions[state];
+        if (stateTransitions) {
+          for (const [, nextState] of stateTransitions) {
+            const nextStateNum = parseInt(nextState, 10);
+            const tile = `${state}${posLabel}${nextStateNum}`;
+            if (!tiles.includes(tile)) {
+              tiles.push(tile);
+            }
+          }
+        }
+      }
       result.push(tiles);
     }
   }
@@ -104,7 +115,7 @@ function generateCompetingTilesByPosition(fsmData: FSMData, inputLength: number)
  */
 function getCorrectTiles(fsmData: FSMData, input: string): string[] {
   const positionLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-  const tiles: string[] = ['A1']; // Anchor: position A, state 1
+  const tiles: string[] = [];
 
   let currentState = fsmData.startstate;
 
@@ -115,14 +126,19 @@ function getCorrectTiles(fsmData: FSMData, input: string): string[] {
       for (const [transSymbol, nextState] of transitions) {
         if (transSymbol === symbol) {
           const nextStateNum = parseInt(nextState, 10);
-          const posLabel = positionLabels[pos + 1]; // B for 1st transition, C for 2nd, etc.
 
-          if (pos === input.length - 1) {
-            // Final position: <fromState><posLabel>
-            tiles.push(`${currentState}${posLabel}`);
+          if (pos === 0) {
+            // Anchor position A: A<toState>
+            tiles.push(`A${nextStateNum}`);
           } else {
-            // Middle positions: <fromState><posLabel><toState>
-            tiles.push(`${currentState}${posLabel}${nextStateNum}`);
+            const posLabel = positionLabels[pos]; // B for pos 1, C for pos 2, etc.
+            if (pos === input.length - 1) {
+              // Final position: <fromState><posLabel>
+              tiles.push(`${currentState}${posLabel}`);
+            } else {
+              // Middle positions: <fromState><posLabel><toState>
+              tiles.push(`${currentState}${posLabel}${nextStateNum}`);
+            }
           }
 
           currentState = nextStateNum;
