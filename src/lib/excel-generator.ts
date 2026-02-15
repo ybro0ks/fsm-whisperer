@@ -50,31 +50,50 @@ export function evaluateFSM(fsmData: FSMData, input: string): { result: 'ACCEPT'
 }
 
 /**
- * Generate all competing tiles based on FSM transitions
- * For each state, include all possible transition tiles
+ * Generate competing tiles organized by position
+ * Position A = anchor (A1*), Position B/C/D/... = all possible tiles at that position
+ * Format: <fromState><positionLabel><toState> e.g., 1B3 means from state 1, position B, to state 3
+ * Returns array of arrays: [[A1*], [1B1, 1B2, 2B1, ...], [1C1, 1C3, ...], ...]
  */
-function generateCompetingTiles(fsmData: FSMData): string[] {
-  const tiles: string[] = [];
-  const stateLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+function generateCompetingTilesByPosition(fsmData: FSMData, inputLength: number): string[][] {
+  const positionLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const result: string[][] = [];
 
-  // For each state, generate tiles for all transitions
-  for (let state = 1; state <= fsmData.states; state++) {
-    const stateTransitions = fsmData.transitions[state];
-    if (stateTransitions) {
-      const currentStateLabel = stateLabels[state - 1] || `S${state}`;
-      for (const [symbol, nextState] of stateTransitions) {
-        const nextStateNum = parseInt(nextState, 10);
-        // Format: <symbol><currentStateLabel><nextStateNum>
-        // e.g., 0B1 means: input 0, from state B, goes to state 1
-        tiles.push(`${symbol}${currentStateLabel}${nextStateNum}*`);
+  // Position A: anchor tile
+  result.push(['A1*']);
+
+  // For each subsequent position, generate all possible competing tiles
+  for (let pos = 1; pos < inputLength; pos++) {
+    const posLabel = positionLabels[pos];
+    const tiles: string[] = [];
+
+    // For each state, list all transitions as competing tiles at this position
+    for (let state = 1; state <= fsmData.states; state++) {
+      const stateTransitions = fsmData.transitions[state];
+      if (stateTransitions) {
+        for (const [, nextState] of stateTransitions) {
+          const nextStateNum = parseInt(nextState, 10);
+          const tile = `${state}${posLabel}${nextStateNum}`;
+          if (!tiles.includes(tile)) {
+            tiles.push(tile);
+          }
+        }
       }
+    }
+
+    // Final position: no toState, just <fromState><posLabel>
+    if (pos === inputLength - 1) {
+      const finalTiles: string[] = [];
+      for (let state = 1; state <= fsmData.states; state++) {
+        finalTiles.push(`${state}${posLabel}`);
+      }
+      result.push(finalTiles);
+    } else {
+      result.push(tiles);
     }
   }
 
-  // For final state D (state 4), include 0D, 1D, 2D, 3D
-  tiles.push('0D', '1D', '2D', '3D');
-
-  return [...new Set(tiles)];
+  return result;
 }
 
 /**
@@ -256,20 +275,23 @@ function generateReagentsAndTilesSheet(
   const { experiments, stockConcentration, targetConcentration, totalVolume } = params;
   const data: (string | number | null)[][] = [];
 
-  // Get competing tiles from FSM
-  const competingTiles = generateCompetingTiles(fsmData);
-  const allTiles = ['A1*', ...competingTiles.filter(t => t !== 'A1*')];
+  // Get the max input length across experiments to determine positions
+  const maxInputLength = Math.max(...experiments.map(exp => exp.fsmInput.length));
+  // Get competing tiles by position (A, B, C, D...)
+  const competingByPosition = generateCompetingTilesByPosition(fsmData, maxInputLength + 1);
+  // Flatten for experiment column
+  const allCompetingTiles = competingByPosition.flat();
   const defaultStock = stockConcentration || 50;
 
   // ===== TOP SECTION: Experiment Tiles =====
-  // Experiment columns = ALL competing tiles (competitive complexity)
+  // Experiment columns = ALL competing tiles organized by position (A1*, then B tiles, then C tiles...)
   // Control columns = only the correct traversal path for each experiment's input
 
   // Get correct tiles per experiment for control columns
   const correctTilesPerExp = experiments.map(exp => getCorrectTiles(fsmData, exp.fsmInput));
 
-  // Find the max row count (competing tiles vs correct tiles)
-  const maxRows = Math.max(allTiles.length, ...correctTilesPerExp.map(t => t.length));
+  // Find the max row count
+  const maxRows = Math.max(allCompetingTiles.length, ...correctTilesPerExp.map(t => t.length));
 
   // Row 1: Empty row for spacing
   data.push([]);
@@ -291,15 +313,15 @@ function generateReagentsAndTilesSheet(
   }
   data.push(expNameRow);
 
-  // Tile rows - experiment gets all competing tiles, control gets correct path
+  // Tile rows - experiment gets all competing tiles by position, control gets correct path
   for (let r = 0; r < maxRows; r++) {
     const row: (string | number | null)[] = [];
     for (let i = 0; i < experiments.length; i++) {
       const volToMove = calculateVolumeToMove(targetConcentration, totalVolume, defaultStock);
       const droplets = calculateDroplets(volToMove);
 
-      // Experiment column: competing tile
-      const competingTile = r < allTiles.length ? allTiles[r] : null;
+      // Experiment column: competing tile (ordered by position)
+      const competingTile = r < allCompetingTiles.length ? allCompetingTiles[r] : null;
       if (competingTile) {
         row.push(competingTile, defaultStock, targetConcentration, Math.round(volToMove * 100) / 100, Math.round(droplets * 1000) / 1000);
       } else {
@@ -346,7 +368,7 @@ function generateReagentsAndTilesSheet(
   // Total row
   const totalRow: (string | number)[] = [];
   for (let i = 0; i < experiments.length; i++) {
-    const tileCount = allTiles.length;
+    const tileCount = allCompetingTiles.length;
     const reagentTotal = SCAFFOLD_REAGENTS.reduce((sum, r) => sum + (r.targetConcentration || 0), 0);
     const tileTotal = tileCount * targetConcentration;
     const total = tileTotal + reagentTotal;
