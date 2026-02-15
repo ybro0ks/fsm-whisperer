@@ -251,6 +251,14 @@ function generateReagentsAndTilesSheet(
   const defaultStock = stockConcentration || 50;
 
   // ===== TOP SECTION: Experiment Tiles =====
+  // Experiment columns = ALL competing tiles (competitive complexity)
+  // Control columns = only the correct traversal path for each experiment's input
+
+  // Get correct tiles per experiment for control columns
+  const correctTilesPerExp = experiments.map(exp => getCorrectTiles(fsmData, exp.fsmInput));
+
+  // Find the max row count (competing tiles vs correct tiles)
+  const maxRows = Math.max(allTiles.length, ...correctTilesPerExp.map(t => t.length));
 
   // Row 1: Empty row for spacing
   data.push([]);
@@ -258,8 +266,8 @@ function generateReagentsAndTilesSheet(
   // Row 2: Group headers
   const groupHeaderRow: (string | null)[] = [];
   for (let i = 0; i < experiments.length; i++) {
-    groupHeaderRow.push('Experiment', null, null, null, null);
-    groupHeaderRow.push('Repeat Experiment', null, null, null, null);
+    groupHeaderRow.push('Experiment (Competing)', null, null, null, null);
+    groupHeaderRow.push('Control (Correct Path)', null, null, null, null);
   }
   data.push(groupHeaderRow);
 
@@ -268,20 +276,32 @@ function generateReagentsAndTilesSheet(
   for (let i = 0; i < experiments.length; i++) {
     const exp = experiments[i];
     expNameRow.push(`${exp.name}`, 'Stock Conc (uM)', 'Target conc (uM)', 'Volume to move (nL)', 'Exact num droplets');
-    expNameRow.push(`${exp.name}`, 'Stock Conc (uM)', 'Target conc (uM)', 'Volume to move (nL)', 'Exact num droplets');
+    expNameRow.push(`${exp.name} (Control)`, 'Stock Conc (uM)', 'Target conc (uM)', 'Volume to move (nL)', 'Exact num droplets');
   }
   data.push(expNameRow);
 
-  // Tile rows
-  for (const tile of allTiles) {
-    const row: (string | number)[] = [];
+  // Tile rows - experiment gets all competing tiles, control gets correct path
+  for (let r = 0; r < maxRows; r++) {
+    const row: (string | number | null)[] = [];
     for (let i = 0; i < experiments.length; i++) {
       const volToMove = calculateVolumeToMove(targetConcentration, totalVolume, defaultStock);
       const droplets = calculateDroplets(volToMove);
-      // Experiment column
-      row.push(tile, defaultStock, targetConcentration, Math.round(volToMove * 100) / 100, Math.round(droplets * 1000) / 1000);
-      // Repeat column
-      row.push(tile, defaultStock, targetConcentration, Math.round(volToMove * 100) / 100, Math.round(droplets * 1000) / 1000);
+
+      // Experiment column: competing tile
+      const competingTile = r < allTiles.length ? allTiles[r] : null;
+      if (competingTile) {
+        row.push(competingTile, defaultStock, targetConcentration, Math.round(volToMove * 100) / 100, Math.round(droplets * 1000) / 1000);
+      } else {
+        row.push(null, null, null, null, null);
+      }
+
+      // Control column: correct path tile
+      const correctTile = r < correctTilesPerExp[i].length ? correctTilesPerExp[i][r] : null;
+      if (correctTile) {
+        row.push(correctTile, defaultStock, targetConcentration, Math.round(volToMove * 100) / 100, Math.round(droplets * 1000) / 1000);
+      } else {
+        row.push(null, null, null, null, null);
+      }
     }
     data.push(row);
   }
