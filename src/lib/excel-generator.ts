@@ -79,22 +79,33 @@ function generateCompetingTiles(fsmData: FSMData): string[] {
 
 /**
  * Get the correct tiles for a specific FSM input (for control columns)
- * Returns only the tiles that would be traversed for the given input
+ * Uses POSITION labels (A=1st, B=2nd, C=3rd, D=4th...)
+ * Format: A1 (anchor), then <fromState><positionLabel><toState>, final position has no toState
+ * Example for input "0101": A1, 1B3, 3C3, 3D
  */
 function getCorrectTiles(fsmData: FSMData, input: string): string[] {
-  const tiles: string[] = ['A1*']; // Always starts with A1
-  const stateLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const positionLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const tiles: string[] = ['A1']; // Anchor: position A, state 1
 
   let currentState = fsmData.startstate;
 
-  for (const symbol of input) {
+  for (let pos = 0; pos < input.length; pos++) {
+    const symbol = input[pos];
     const transitions = fsmData.transitions[currentState];
     if (transitions) {
       for (const [transSymbol, nextState] of transitions) {
         if (transSymbol === symbol) {
-          const currentLabel = stateLabels[currentState - 1] || `S${currentState}`;
           const nextStateNum = parseInt(nextState, 10);
-          tiles.push(`${symbol}${currentLabel}${nextStateNum}*`);
+          const posLabel = positionLabels[pos + 1]; // B for 1st transition, C for 2nd, etc.
+
+          if (pos === input.length - 1) {
+            // Final position: <fromState><posLabel>
+            tiles.push(`${currentState}${posLabel}`);
+          } else {
+            // Middle positions: <fromState><posLabel><toState>
+            tiles.push(`${currentState}${posLabel}${nextStateNum}`);
+          }
+
           currentState = nextStateNum;
           break;
         }
