@@ -20,6 +20,7 @@ export interface ExcelGenerationParams {
   stockConcentration: number;
   targetConcentration: number;
   totalVolume: number;
+  reportEveryPosition: boolean;
 }
 
 // Reagent configurations with default stock concentrations
@@ -227,8 +228,13 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
     data.push(Array(numCols).fill(null));
   }
 
-  // Experiment section: one row per bit position
-  // "Experiment" label row
+  // Determine bit positions to report
+  const reportEvery = params.reportEveryPosition;
+  const bitPositions = reportEvery
+    ? Array.from({ length: maxInputLen }, (_, i) => i)
+    : [maxInputLen - 1]; // only last bit
+
+  // Experiment section
   const expLabelRow: (string | null)[] = [null, null];
   for (let i = 0; i < experiments.length; i++) {
     expLabelRow.push('Experiment');
@@ -236,11 +242,12 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   }
   data.push(expLabelRow);
 
-  // Experiment name rows - one per bit position
-  for (let bit = 0; bit < maxInputLen; bit++) {
+  // Experiment name rows
+  for (const bit of bitPositions) {
     const row: (string | null)[] = [null, null];
     for (const exp of experiments) {
-      const expName = `${exp.name}; Bit ${bit}; Ans ${exp.finalState}`;
+      const label = reportEvery ? `Bit ${bit}` : `Position ${exp.finalState}`;
+      const expName = `${exp.name}; ${label}; Ans ${exp.finalState}`;
       row.push(expName);
       row.push(expName);
     }
@@ -250,11 +257,12 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   // Empty spacing
   data.push(Array(numCols).fill(null));
 
-  // Control section: one row per bit position with "; Control" appended
-  for (let bit = 0; bit < maxInputLen; bit++) {
+  // Control section
+  for (const bit of bitPositions) {
     const row: (string | null)[] = [null, null];
     for (const exp of experiments) {
-      const ctrlName = `${exp.name}; Bit ${bit}; Ans ${exp.finalState}; Control`;
+      const label = reportEvery ? `Bit ${bit}` : `Position ${exp.finalState}`;
+      const ctrlName = `${exp.name}; ${label}; Ans ${exp.finalState}; Control`;
       row.push(ctrlName);
       row.push(ctrlName);
     }

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, FileSpreadsheet, Download, AlertCircle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ export default function GenerateExcelPage() {
   const [stockConcentration, setStockConcentration] = useState<number>(50);
   const [targetConcentration, setTargetConcentration] = useState<number>(1);
   const [totalVolume, setTotalVolume] = useState<number>(80);
+  const [reportEveryPosition, setReportEveryPosition] = useState<boolean>(false);
   
   // Error state
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +174,7 @@ export default function GenerateExcelPage() {
         stockConcentration: stockConcentration || 50,
         targetConcentration,
         totalVolume,
+        reportEveryPosition,
       }, fsmData);
       
       const filename = generateFilename();
@@ -271,6 +274,20 @@ export default function GenerateExcelPage() {
                   value={experimentCount}
                   onChange={(e) => setExperimentCount(parseInt(e.target.value) || 1)}
                   className="font-mono"
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="reportEvery">Report at every position?</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable for programs like addition where each bit position produces part of the answer.
+                    Disable to report only at the final position.
+                  </p>
+                </div>
+                <Switch
+                  id="reportEvery"
+                  checked={reportEveryPosition}
+                  onCheckedChange={setReportEveryPosition}
                 />
               </div>
             </div>
