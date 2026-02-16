@@ -223,11 +223,6 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   for (let i = 0; i < experiments.length * 2; i++) rfRow.push(null);
   data.push(rfRow);
 
-  // Rows 4+: Empty rows for positions C-H (6 empty rows to match image)
-  for (let r = 0; r < 6; r++) {
-    data.push(Array(numCols).fill(null));
-  }
-
   // Determine bit positions to report
   const reportEvery = params.reportEveryPosition;
   const bitPositions = reportEvery
@@ -268,16 +263,6 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
     }
     data.push(row);
   }
-
-  // Empty spacing
-  data.push(Array(numCols).fill(null));
-
-  // Total row
-  const totalRow: (string | number | null)[] = [null, null];
-  for (let i = 0; i < experiments.length * 2; i++) {
-    totalRow.push(params.totalVolume);
-  }
-  data.push(totalRow);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
