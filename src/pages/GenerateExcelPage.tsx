@@ -28,7 +28,7 @@ export default function GenerateExcelPage() {
   
   // Form data
   const [experimentCount, setExperimentCount] = useState<number>(1);
-  const [bufferName] = useState<string>('5RF (ATTO) 79nM');
+  const bufferName = '5RF (ATTO) 79nM';
   const [experiments, setExperiments] = useState<ExperimentData[]>([]);
   const [stockConcentration, setStockConcentration] = useState<number>(50);
   const [targetConcentration, setTargetConcentration] = useState<number>(1);
@@ -169,7 +169,6 @@ export default function GenerateExcelPage() {
       
       const workbook = generateExcelWorkbook({
         experiments: experimentInputs,
-        bufferName: bufferName || '5RF (ATTO) 79nM',
         stockConcentration: stockConcentration || 50,
         targetConcentration,
         totalVolume,
@@ -398,7 +397,7 @@ export default function GenerateExcelPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Buffer:</span>
-                    <span className="ml-2 font-mono text-xs">{bufferName || '5RF (ATTO) 79nM'}</span>
+                    <span className="ml-2 font-mono text-xs">5RF (ATTO) 79nM</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Stock Conc.:</span>

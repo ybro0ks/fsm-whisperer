@@ -17,7 +17,6 @@ export interface ExperimentInput {
 
 export interface ExcelGenerationParams {
   experiments: ExperimentInput[];
-  bufferName: string;
   stockConcentration: number;
   targetConcentration: number;
   totalVolume: number;
@@ -196,61 +195,87 @@ export function generateExcelWorkbook(
  * Generate Experiment_Layout sheet
  */
 function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.WorkSheet {
-  const { experiments, bufferName } = params;
+  const { experiments } = params;
+  const bufferName = '5RF (ATTO) 79nM';
   const data: (string | number | null)[][] = [];
 
-  // Row 1: Headers - Buffer, Buffer (Control), then alternating Experiment/Control
-  const headerRow: string[] = ['Buffer', 'Buffer (Control)'];
+  // Each experiment gets ONE column with Experiment + Control stacked vertically,
+  // repeated twice (2 columns per experiment)
+  const numCols = 2 + experiments.length * 2; // Buffer, Buffer(Control), then 2 per experiment
+
+  // Row 1: Column headers
+  const headerRow: (string | null)[] = ['Buffer', 'Buffer (Control)'];
   for (let i = 0; i < experiments.length; i++) {
-    headerRow.push('Experiment');
-    headerRow.push('Control');
+    headerRow.push(`Experiment ${i + 1}`);
+    headerRow.push(`Experiment ${i + 1} (Repeat)`);
   }
   data.push(headerRow);
 
-  // Row 2: Buffer values and experiment names
-  // Format: <Experiment Name>; Position <Final FSM State>; <Fluorophore>
-  const valuesRow: string[] = [bufferName, bufferName];
+  // Row 2: Buffer name in buffer columns, blank for experiments
+  const row2: (string | null)[] = [bufferName, bufferName];
+  for (let i = 0; i < experiments.length; i++) {
+    row2.push(null, null);
+  }
+  data.push(row2);
+
+  // Row 3: Empty spacing
+  data.push(Array(numCols).fill(''));
+
+  // Row 4: "Experiment" label row
+  const expLabelRow: (string | null)[] = ['', ''];
+  for (let i = 0; i < experiments.length; i++) {
+    expLabelRow.push('Experiment');
+    expLabelRow.push('Experiment');
+  }
+  data.push(expLabelRow);
+
+  // Row 5: Experiment name
+  const expNameRow: (string | null)[] = ['', ''];
   for (const exp of experiments) {
     const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
-    valuesRow.push(expName);
-    valuesRow.push(expName); // Control has same name
+    expNameRow.push(expName);
+    expNameRow.push(expName);
   }
-  data.push(valuesRow);
+  data.push(expNameRow);
 
-  // Row 3: Empty (reserved spacing)
-  data.push(Array(headerRow.length).fill(''));
+  // Row 6: Empty spacing
+  data.push(Array(numCols).fill(''));
 
-  // Row 4: Experiment results (ACCEPT / REJECT)
-  const resultsRow: string[] = ['', ''];
+  // Row 7: "Control" label row
+  const ctrlLabelRow: (string | null)[] = ['', ''];
+  for (let i = 0; i < experiments.length; i++) {
+    ctrlLabelRow.push('Control');
+    ctrlLabelRow.push('Control');
+  }
+  data.push(ctrlLabelRow);
+
+  // Row 8: Control name (same as experiment name)
+  const ctrlNameRow: (string | null)[] = ['', ''];
+  for (const exp of experiments) {
+    const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
+    ctrlNameRow.push(expName);
+    ctrlNameRow.push(expName);
+  }
+  data.push(ctrlNameRow);
+
+  // Row 9: Empty spacing
+  data.push(Array(numCols).fill(''));
+
+  // Row 10: Result row (ACCEPT / REJECT)
+  const resultsRow: (string | null)[] = ['', ''];
   for (const exp of experiments) {
     resultsRow.push(exp.result);
-    resultsRow.push(''); // Control has no result shown
+    resultsRow.push(exp.result);
   }
   data.push(resultsRow);
-
-  // Rows 5-8: Empty spacing (4 rows)
-  for (let i = 0; i < 4; i++) {
-    data.push(Array(headerRow.length).fill(''));
-  }
-
-  // Row 9: qPCR Positioning header
-  data.push(['QPCR Positioning']);
-
-  // qPCR positioning values
-  data.push(['Buffer']);
-  data.push([bufferName]);
-
-  for (let i = 0; i < experiments.length; i++) {
-    const exp = experiments[i];
-    const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
-    data.push([`Experiment ${i + 1}: ${expName}`]);
-    data.push([`Control ${i + 1}: ${expName}`]);
-  }
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   // Set column widths
-  const colWidths = headerRow.map((_, idx) => ({ wch: idx < 2 ? 20 : 40 }));
+  const colWidths: { wch: number }[] = [];
+  for (let i = 0; i < numCols; i++) {
+    colWidths.push({ wch: i < 2 ? 20 : 40 });
+  }
   ws['!cols'] = colWidths;
 
   return ws;
@@ -355,15 +380,11 @@ function generateReagentsAndTilesSheet(
     data.push(row);
   }
 
-  // Total row
+  // Total row - should equal the total volume (e.g. 80 nL)
   const totalRow: (string | number)[] = [];
   for (let i = 0; i < experiments.length; i++) {
-    const tileCount = competingTilesPerExp[i].length;
-    const reagentTotal = SCAFFOLD_REAGENTS.reduce((sum, r) => sum + (r.targetConcentration || 0), 0);
-    const tileTotal = tileCount * targetConcentration;
-    const total = tileTotal + reagentTotal;
-    totalRow.push('Total', '', '', Math.round(total * 100) / 100, '');
-    totalRow.push('Total', '', '', Math.round(total * 100) / 100, '');
+    totalRow.push('Total', '', '', totalVolume, '');
+    totalRow.push('Total', '', '', totalVolume, '');
   }
   data.push(totalRow);
 
@@ -422,7 +443,7 @@ function generateReagentsAndTilesSheet(
     }
 
     const expTotal = fiveRF.volume + expBufferReagents.reduce((sum, r) => sum + r.volume, 0);
-    data.push(['Total', null, null, totalVolume || expTotal, null, null, 'Total', null, null, totalVolume || expTotal, null]);
+    data.push(['Total', null, null, expTotal, null, null, 'Total', null, null, expTotal, null]);
     data.push([]);
     data.push([]);
   }
@@ -445,13 +466,13 @@ function generateReagentsAndTilesSheet(
  * Generate Metadata sheet
  */
 function generateMetadataSheet(params: ExcelGenerationParams): XLSX.WorkSheet {
-  const { experiments, bufferName, stockConcentration, targetConcentration, totalVolume } = params;
+  const { experiments, stockConcentration, targetConcentration, totalVolume } = params;
 
   const data: (string | number)[][] = [
     ['Property', 'Value'],
     ['Timestamp', new Date().toISOString()],
     ['Number of Experiments', experiments.length],
-    ['Buffer Name', bufferName],
+    ['Buffer Name', '5RF (ATTO) 79nM'],
     ['Stock Concentration', stockConcentration],
     ['Target Concentration', targetConcentration],
     ['Total Volume', totalVolume],
