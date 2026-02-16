@@ -198,74 +198,85 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   const { experiments } = params;
   const data: (string | number | null)[][] = [];
 
-  // Columns: Buffer, Buffer(Control), 5RF ATTO, 5RF ATTO(Control), then 2 per experiment
-  const numCols = 4 + experiments.length * 2;
+  // Columns: 2 for Buffer/5RF ATTO, then 2 per experiment (repeated)
+  const numCols = 2 + experiments.length * 2;
+
+  // Determine max input length for row count
+  const maxInputLen = Math.max(...experiments.map(e => e.fsmInput.length), 1);
 
   // Row 1: Column headers
-  const headerRow: (string | null)[] = ['Buffer', 'Buffer (Control)', '5RF ATTO', '5RF ATTO (Control)'];
+  const headerRow: (string | null)[] = [null, null];
   for (let i = 0; i < experiments.length; i++) {
     headerRow.push(`Experiment ${i + 1}`);
     headerRow.push(`Experiment ${i + 1} (Repeat)`);
   }
   data.push(headerRow);
 
-  // Row 2: Empty spacing
-  data.push(Array(numCols).fill(''));
+  // Row 2: "Buffer" label in first 2 columns
+  const bufferRow: (string | null)[] = ['Buffer', 'Buffer'];
+  for (let i = 0; i < experiments.length * 2; i++) bufferRow.push(null);
+  data.push(bufferRow);
 
-  // Row 3: "Experiment" label row
-  const expLabelRow: (string | null)[] = ['', '', '', ''];
+  // Row 3: "5RF (ATTO) 79nM" in first 2 columns
+  const rfRow: (string | null)[] = ['5RF (ATTO) 79nM', '5RF (ATTO) 79nM'];
+  for (let i = 0; i < experiments.length * 2; i++) rfRow.push(null);
+  data.push(rfRow);
+
+  // Rows 4+: Empty rows for positions C-H (6 empty rows to match image)
+  for (let r = 0; r < 6; r++) {
+    data.push(Array(numCols).fill(null));
+  }
+
+  // Experiment section: one row per bit position
+  // "Experiment" label row
+  const expLabelRow: (string | null)[] = [null, null];
   for (let i = 0; i < experiments.length; i++) {
     expLabelRow.push('Experiment');
     expLabelRow.push('Experiment');
   }
   data.push(expLabelRow);
 
-  // Row 4: Experiment name
-  const expNameRow: (string | null)[] = ['', '', '', ''];
-  for (const exp of experiments) {
-    const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
-    expNameRow.push(expName);
-    expNameRow.push(expName);
+  // Experiment name rows - one per bit position
+  for (let bit = 0; bit < maxInputLen; bit++) {
+    const row: (string | null)[] = [null, null];
+    for (const exp of experiments) {
+      const expName = `${exp.name}; Bit ${bit}; Ans ${exp.finalState}`;
+      row.push(expName);
+      row.push(expName);
+    }
+    data.push(row);
   }
-  data.push(expNameRow);
 
-  // Row 5: Empty spacing
-  data.push(Array(numCols).fill(''));
+  // Empty spacing
+  data.push(Array(numCols).fill(null));
 
-  // Row 6: "Control" label row
-  const ctrlLabelRow: (string | null)[] = ['', '', '', ''];
-  for (let i = 0; i < experiments.length; i++) {
-    ctrlLabelRow.push('Control');
-    ctrlLabelRow.push('Control');
+  // Control section: one row per bit position with "; Control" appended
+  for (let bit = 0; bit < maxInputLen; bit++) {
+    const row: (string | null)[] = [null, null];
+    for (const exp of experiments) {
+      const ctrlName = `${exp.name}; Bit ${bit}; Ans ${exp.finalState}; Control`;
+      row.push(ctrlName);
+      row.push(ctrlName);
+    }
+    data.push(row);
   }
-  data.push(ctrlLabelRow);
 
-  // Row 7: Control name
-  const ctrlNameRow: (string | null)[] = ['', '', '', ''];
-  for (const exp of experiments) {
-    const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
-    ctrlNameRow.push(expName);
-    ctrlNameRow.push(expName);
+  // Empty spacing
+  data.push(Array(numCols).fill(null));
+
+  // Total row
+  const totalRow: (string | number | null)[] = [null, null];
+  for (let i = 0; i < experiments.length * 2; i++) {
+    totalRow.push(params.totalVolume);
   }
-  data.push(ctrlNameRow);
-
-  // Row 8: Empty spacing
-  data.push(Array(numCols).fill(''));
-
-  // Row 9: Result row (ACCEPT / REJECT)
-  const resultsRow: (string | null)[] = ['', '', '', ''];
-  for (const exp of experiments) {
-    resultsRow.push(exp.result);
-    resultsRow.push(exp.result);
-  }
-  data.push(resultsRow);
+  data.push(totalRow);
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   // Set column widths
   const colWidths: { wch: number }[] = [];
   for (let i = 0; i < numCols; i++) {
-    colWidths.push({ wch: i < 4 ? 20 : 40 });
+    colWidths.push({ wch: i < 2 ? 20 : 40 });
   }
   ws['!cols'] = colWidths;
 
@@ -463,7 +474,6 @@ function generateMetadataSheet(params: ExcelGenerationParams): XLSX.WorkSheet {
     ['Property', 'Value'],
     ['Timestamp', new Date().toISOString()],
     ['Number of Experiments', experiments.length],
-    ['Buffer Name', '5RF (ATTO) 79nM'],
     ['Stock Concentration', stockConcentration],
     ['Target Concentration', targetConcentration],
     ['Total Volume', totalVolume],

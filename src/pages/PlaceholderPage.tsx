@@ -9,7 +9,7 @@ export default function PlaceholderPage() {
 
   const featureNames: Record<string, string> = {
     'generate-states': 'Generate States',
-    'generate-excel': 'Generate Excel Sheet',
+    'generate-excel': 'Generate Experiment Sheet',
   };
 
   const featureName = feature ? featureNames[feature] || feature : 'Feature';
