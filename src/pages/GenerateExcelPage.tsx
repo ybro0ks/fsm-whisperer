@@ -28,7 +28,7 @@ export default function GenerateExcelPage() {
   
   // Form data
   const [experimentCount, setExperimentCount] = useState<number>(1);
-  const bufferName = '5RF (ATTO) 79nM';
+  
   const [experiments, setExperiments] = useState<ExperimentData[]>([]);
   const [stockConcentration, setStockConcentration] = useState<number>(50);
   const [targetConcentration, setTargetConcentration] = useState<number>(1);
@@ -188,14 +188,14 @@ export default function GenerateExcelPage() {
     count: 'Step 1: Number of Experiments',
     experiments: 'Step 2: Experiment Details',
     concentrations: 'Step 3: Concentration & Volume',
-    generate: 'Step 4: Generate Excel File',
+    generate: 'Step 4: Generate Experiment Sheet',
   };
 
   const stepDescriptions: Record<Step, string> = {
     count: 'How many experiments are being performed?',
     experiments: 'Enter details for each experiment including fluorophore',
     concentrations: 'Enter concentration and volume parameters',
-    generate: 'Review and generate your Excel file',
+    generate: 'Review and generate your experiment sheet',
   };
 
   return (
@@ -213,7 +213,7 @@ export default function GenerateExcelPage() {
         
         <div className="flex items-center gap-3 mb-2">
           <FileSpreadsheet className="w-8 h-8 text-primary" />
-          <h1 className="text-2xl font-bold font-mono text-foreground">Generate Excel Sheet</h1>
+          <h1 className="text-2xl font-bold font-mono text-foreground">Generate Experiment Sheet</h1>
         </div>
         <p className="text-muted-foreground">FSM: {fsmData.name}</p>
       </div>
@@ -396,10 +396,6 @@ export default function GenerateExcelPage() {
                     <span className="ml-2 font-mono">{experiments.length}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Buffer:</span>
-                    <span className="ml-2 font-mono text-xs">5RF (ATTO) 79nM</span>
-                  </div>
-                  <div>
                     <span className="text-muted-foreground">Stock Conc.:</span>
                     <span className="ml-2 font-mono">{stockConcentration || 50} µM</span>
                   </div>
@@ -442,7 +438,7 @@ export default function GenerateExcelPage() {
                 className="w-full h-12"
               >
                 <Download className="w-5 h-5 mr-2" />
-                {isGenerating ? 'Generating...' : 'Download Excel File'}
+                {isGenerating ? 'Generating...' : 'Download Experiment Sheet'}
               </Button>
             </div>
           )}
