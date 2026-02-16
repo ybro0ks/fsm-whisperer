@@ -196,41 +196,32 @@ export function generateExcelWorkbook(
  */
 function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.WorkSheet {
   const { experiments } = params;
-  const bufferName = '5RF (ATTO) 79nM';
   const data: (string | number | null)[][] = [];
 
-  // Each experiment gets ONE column with Experiment + Control stacked vertically,
-  // repeated twice (2 columns per experiment)
-  const numCols = 2 + experiments.length * 2; // Buffer, Buffer(Control), then 2 per experiment
+  // Columns: Buffer, Buffer(Control), 5RF ATTO, 5RF ATTO(Control), then 2 per experiment
+  const numCols = 4 + experiments.length * 2;
 
   // Row 1: Column headers
-  const headerRow: (string | null)[] = ['Buffer', 'Buffer (Control)'];
+  const headerRow: (string | null)[] = ['Buffer', 'Buffer (Control)', '5RF ATTO', '5RF ATTO (Control)'];
   for (let i = 0; i < experiments.length; i++) {
     headerRow.push(`Experiment ${i + 1}`);
     headerRow.push(`Experiment ${i + 1} (Repeat)`);
   }
   data.push(headerRow);
 
-  // Row 2: Buffer name in buffer columns, blank for experiments
-  const row2: (string | null)[] = [bufferName, bufferName];
-  for (let i = 0; i < experiments.length; i++) {
-    row2.push(null, null);
-  }
-  data.push(row2);
-
-  // Row 3: Empty spacing
+  // Row 2: Empty spacing
   data.push(Array(numCols).fill(''));
 
-  // Row 4: "Experiment" label row
-  const expLabelRow: (string | null)[] = ['', ''];
+  // Row 3: "Experiment" label row
+  const expLabelRow: (string | null)[] = ['', '', '', ''];
   for (let i = 0; i < experiments.length; i++) {
     expLabelRow.push('Experiment');
     expLabelRow.push('Experiment');
   }
   data.push(expLabelRow);
 
-  // Row 5: Experiment name
-  const expNameRow: (string | null)[] = ['', ''];
+  // Row 4: Experiment name
+  const expNameRow: (string | null)[] = ['', '', '', ''];
   for (const exp of experiments) {
     const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
     expNameRow.push(expName);
@@ -238,19 +229,19 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   }
   data.push(expNameRow);
 
-  // Row 6: Empty spacing
+  // Row 5: Empty spacing
   data.push(Array(numCols).fill(''));
 
-  // Row 7: "Control" label row
-  const ctrlLabelRow: (string | null)[] = ['', ''];
+  // Row 6: "Control" label row
+  const ctrlLabelRow: (string | null)[] = ['', '', '', ''];
   for (let i = 0; i < experiments.length; i++) {
     ctrlLabelRow.push('Control');
     ctrlLabelRow.push('Control');
   }
   data.push(ctrlLabelRow);
 
-  // Row 8: Control name (same as experiment name)
-  const ctrlNameRow: (string | null)[] = ['', ''];
+  // Row 7: Control name
+  const ctrlNameRow: (string | null)[] = ['', '', '', ''];
   for (const exp of experiments) {
     const expName = `${exp.name}; Position ${exp.finalState}; ${exp.fluorophore}`;
     ctrlNameRow.push(expName);
@@ -258,11 +249,11 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   }
   data.push(ctrlNameRow);
 
-  // Row 9: Empty spacing
+  // Row 8: Empty spacing
   data.push(Array(numCols).fill(''));
 
-  // Row 10: Result row (ACCEPT / REJECT)
-  const resultsRow: (string | null)[] = ['', ''];
+  // Row 9: Result row (ACCEPT / REJECT)
+  const resultsRow: (string | null)[] = ['', '', '', ''];
   for (const exp of experiments) {
     resultsRow.push(exp.result);
     resultsRow.push(exp.result);
@@ -274,7 +265,7 @@ function generateExperimentLayoutSheet(params: ExcelGenerationParams): XLSX.Work
   // Set column widths
   const colWidths: { wch: number }[] = [];
   for (let i = 0; i < numCols; i++) {
-    colWidths.push({ wch: i < 2 ? 20 : 40 });
+    colWidths.push({ wch: i < 4 ? 20 : 40 });
   }
   ws['!cols'] = colWidths;
 
