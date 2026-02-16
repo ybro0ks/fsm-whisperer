@@ -15,7 +15,6 @@ type Step = 'count' | 'experiments' | 'concentrations' | 'generate';
 interface ExperimentData {
   name: string;
   fsmInput: string;
-  fluorophore: string;
   result: 'ACCEPT' | 'REJECT' | null;
   finalState: number | null;
 }
@@ -56,7 +55,6 @@ export default function GenerateExcelPage() {
       newExperiments.push({
         name: '',
         fsmInput: '',
-        fluorophore: 'ANS N',
         result: null,
         finalState: null,
       });
@@ -92,10 +90,6 @@ export default function GenerateExcelPage() {
       }
       if (!exp.fsmInput.trim()) {
         setError(`Experiment ${i + 1} is missing an FSM input value`);
-        return false;
-      }
-      if (!exp.fluorophore.trim()) {
-        setError(`Experiment ${i + 1} is missing a fluorophore`);
         return false;
       }
       if (exp.result === null) {
@@ -166,7 +160,7 @@ export default function GenerateExcelPage() {
         fsmInput: exp.fsmInput,
         result: exp.result!,
         finalState: exp.finalState!,
-        fluorophore: exp.fluorophore,
+        fluorophore: 'ANS N',
       }));
       
       const workbook = generateExcelWorkbook({
@@ -342,18 +336,6 @@ export default function GenerateExcelPage() {
                         className="font-mono"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor={`exp-fluor-${idx}`} className="text-xs">
-                        Fluorophore (e.g., ANS N)
-                      </Label>
-                      <Input
-                        id={`exp-fluor-${idx}`}
-                        placeholder="ANS N"
-                        value={exp.fluorophore}
-                        onChange={(e) => updateExperiment(idx, 'fluorophore', e.target.value)}
-                        className="font-mono"
-                      />
-                    </div>
                   </div>
                 </Card>
               ))}
@@ -441,7 +423,7 @@ export default function GenerateExcelPage() {
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
                           Input: <code className="bg-muted px-1 rounded">{exp.fsmInput}</code>
-                          {' → '}Position {exp.finalState}; {exp.fluorophore}
+                          {' → '}Position {exp.finalState}
                         </div>
                       </div>
                     ))}
